@@ -518,6 +518,20 @@
 </div>
 </div>
 </div>
+<!-- Automatic Tax Rules Update -->
+<div class="space-y-3 border-b border-slate-100 dark:border-slate-700 pb-5">
+<h3 class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+<span>🔄</span> <span id="lbl-tax-rules-header">עדכון אוטומטי של נתוני מס</span>
+</h3>
+<p class="text-[11px] text-slate-400" id="lbl-tax-rules-desc">המערכת טוענת את נתוני המס מקובץ tax-rules.json ומחזיקה עותק מקומי למקרה שאין חיבור לרשת.</p>
+<div class="flex items-center justify-between gap-2 p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-700">
+<div class="min-w-0">
+<div class="text-xs font-bold" id="tax-rules-status">נתוני מס: בודק...</div>
+<div class="text-[10px] text-slate-400 mt-0.5" id="tax-rules-last-updated"></div>
+</div>
+<button type="button" onclick="refreshTaxRules(true)" class="shrink-0 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold active:scale-95 transition" id="btn-refresh-tax-rules">עדכן עכשיו</button>
+</div>
+</div>
 <button class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-2xl shadow-lg shadow-emerald-600/20 text-sm transition" id="btn-save-settings" onclick="saveAllSettings()" type="button">
           שמור הגדרות וחשב מחדש את הדוח
         </button>
@@ -798,6 +812,16 @@
         ratesTaxExempt: 'פטור ממס הכנסה — לא לנכות מס הכנסה',
         ratesTaxHint: 'ברירת המחדל מבוססת על מדרגות מס 2026 ושווי נקודת זיכוי של 242 ₪ לחודש. החישוב: מס לפי מדרגות → הפחתת נקודות זיכוי → פטור מלא אם מסומן. יש לעדכן את נקודות הזיכוי לפי הנתונים האישיים.',
         saveRates: 'שמור שיעורים',
+        taxRulesHeader: 'עדכון אוטומטי של נתוני מס',
+        taxRulesDesc: 'המערכת טוענת את נתוני המס מקובץ tax-rules.json ושומרת עותק מקומי למקרה שאין חיבור לרשת.',
+        taxRulesChecking: 'נתוני מס: בודק...',
+        taxRulesUpdated: 'נתוני מס: עודכנו אוטומטית',
+        taxRulesCached: 'נתוני מס: משתמש בעותק שמור',
+        taxRulesBuiltin: 'נתוני מס: משתמש בברירת המחדל המובנית',
+        taxRulesFailed: 'נתוני מס: לא ניתן לעדכן כרגע',
+        taxRulesLastUpdated: 'עדכון אחרון: {date}',
+        taxRulesNeverUpdated: 'עדיין לא בוצע עדכון מקובץ חיצוני',
+        refreshTaxRules: 'עדכן עכשיו',
         vacationLeaveBtn: '🌴 ימי חופש',
         sickLeaveBtn: '🤒 ימי מחלה',
         leaveModalVacationTitle: '🌴 רישום ימי חופש',
@@ -937,6 +961,16 @@
         ratesTaxExempt: 'Income Tax Exempt — Do not deduct income tax',
         ratesTaxHint: 'Default values are based on 2026 tax brackets and a tax credit point value of ₪242 per month. Calculation: tax by brackets → tax credit points → full exemption if selected. Update tax credit points according to personal details.',
         saveRates: 'Save Rates',
+        taxRulesHeader: 'Automatic Tax Data Update',
+        taxRulesDesc: 'The app loads tax data from tax-rules.json and keeps a local copy for offline fallback.',
+        taxRulesChecking: 'Tax data: checking...',
+        taxRulesUpdated: 'Tax data: updated automatically',
+        taxRulesCached: 'Tax data: using saved copy',
+        taxRulesBuiltin: 'Tax data: using built-in baseline',
+        taxRulesFailed: 'Tax data: unable to update right now',
+        taxRulesLastUpdated: 'Last update: {date}',
+        taxRulesNeverUpdated: 'No external file update yet',
+        refreshTaxRules: 'Update now',
         vacationLeaveBtn: '🌴 Vacation Days',
         sickLeaveBtn: '🤒 Sick Days',
         leaveModalVacationTitle: '🌴 Record Vacation Days',
@@ -991,6 +1025,10 @@
         }
       ],
       rates: { btlLowRate: 1.04, btlHighRate: 7.00, healthLowRate: 3.23, healthHighRate: 5.17, pensionRate: 6.00, studyFundRate: 2.50, threshold: 7703, incomeTaxRates: [10,14,20,31,35,47,50], incomeTaxBrackets: [7010,10060,19000,25100,46690,60130], taxCreditPoints: 2.25, taxCreditPointValue: 242, incomeTaxExempt: false },
+      taxRules: null,
+      taxRulesAutoUpdate: true,
+      taxRulesLastChecked: null,
+      taxRulesLastUpdated: null,
       shifts: [
         { id: 1, workplaceId: 1, date: '2026-09-17', displayDate: '17/9', start: '08:00', end: '18:00', breakMinutes: 60, hours: 9.0, hoursFormatted: '09:00', typeId: 101, grossPay: 324.00, isLeave: false, notes: 'משמרת מלאה במשרד' }
       ],
@@ -1164,6 +1202,10 @@
       setText('lbl-rates-tax-hint', t.ratesTaxHint);
       const incomePlaceholders = state.lang === 'en' ? ['Up to 7,010','7,011–10,060','10,061–19,000','19,001–25,100','25,101–46,690','46,691–60,130','Above 60,130'] : ['עד 7,010','7,011–10,060','10,061–19,000','19,001–25,100','25,101–46,690','46,691–60,130','מעל 60,130'];
       incomePlaceholders.forEach((ph,i)=>{ const el=document.getElementById(`rate-income-${i+1}`); if(el) el.placeholder=ph; });
+      setText('lbl-tax-rules-header', t.taxRulesHeader);
+      setText('lbl-tax-rules-desc', t.taxRulesDesc);
+      setText('btn-refresh-tax-rules', t.refreshTaxRules);
+      renderTaxRulesStatus();
       setText('btn-save-rates', t.saveRates);
       setText('btn-cancel-rates', t.cancel);
 
@@ -1488,6 +1530,161 @@
       return total;
     }
 
+    // Automatic tax-rule loading. Statutory fields come from tax-rules.json;
+    // personal settings such as pension/study-fund rates and credit points remain user-controlled.
+    const BUILTIN_TAX_RULES = {
+      schemaVersion: 1,
+      source: 'Built-in 2026 baseline',
+      updatedAt: '2026-09-21',
+      periods: [{
+        from: '2026-01-01',
+        to: null,
+        rules: {
+          btlLowRate: 1.04,
+          btlHighRate: 7.00,
+          healthLowRate: 3.23,
+          healthHighRate: 5.17,
+          threshold: 7703,
+          incomeTaxRates: [10, 14, 20, 31, 35, 47, 50],
+          incomeTaxBrackets: [7010, 10060, 19000, 25100, 46690, 60130],
+          taxCreditPointValue: 242
+        }
+      }]
+    };
+    const TAX_RULES_URL = './tax-rules.json';
+    const TAX_RULES_CACHE_KEY = 'salary_app_tax_rules_v1';
+    const TAX_RULES_META_KEY = 'salary_app_tax_rules_meta_v1';
+
+    function normalizeTaxRules(raw) {
+      if (!raw || !Array.isArray(raw.periods) || !raw.periods.length) throw new Error('Invalid tax rules');
+      const periods = raw.periods.map(p => {
+        if (!p || !p.from || !p.rules) throw new Error('Invalid tax period');
+        const r = p.rules;
+        if (!Array.isArray(r.incomeTaxRates) || r.incomeTaxRates.length !== 7) throw new Error('Invalid income tax rates');
+        if (!Array.isArray(r.incomeTaxBrackets) || r.incomeTaxBrackets.length !== 6) throw new Error('Invalid income tax brackets');
+        return {
+          from: String(p.from),
+          to: p.to ? String(p.to) : null,
+          rules: {
+            btlLowRate: Number(r.btlLowRate), btlHighRate: Number(r.btlHighRate),
+            healthLowRate: Number(r.healthLowRate), healthHighRate: Number(r.healthHighRate),
+            threshold: Number(r.threshold),
+            incomeTaxRates: r.incomeTaxRates.map(Number),
+            incomeTaxBrackets: r.incomeTaxBrackets.map(Number),
+            taxCreditPointValue: Number(r.taxCreditPointValue)
+          }
+        };
+      });
+      periods.sort((a,b) => a.from.localeCompare(b.from));
+      return { schemaVersion: Number(raw.schemaVersion || 1), source: String(raw.source || 'External tax rules'), updatedAt: raw.updatedAt || null, periods };
+    }
+
+    function getTaxRulesForDate(dateValue) {
+      const rules = state.taxRules || BUILTIN_TAX_RULES;
+      const date = String(dateValue || new Date().toISOString().slice(0,10));
+      let selected = null;
+      for (const period of (rules.periods || [])) {
+        if (date >= period.from && (!period.to || date <= period.to)) selected = period;
+      }
+      if (!selected && rules.periods?.length) {
+        selected = rules.periods.filter(p => p.from <= date).slice(-1)[0] || rules.periods[0];
+      }
+      return selected ? selected.rules : BUILTIN_TAX_RULES.periods[0].rules;
+    }
+
+    function saveTaxRulesCache(rules) {
+      try {
+        localStorage.setItem(TAX_RULES_CACHE_KEY, JSON.stringify(rules));
+        localStorage.setItem(TAX_RULES_META_KEY, JSON.stringify({ updatedAt: rules.updatedAt || null, checkedAt: new Date().toISOString(), source: rules.source || '' }));
+      } catch (e) {}
+    }
+
+    function loadTaxRulesCache() {
+      try {
+        const raw = localStorage.getItem(TAX_RULES_CACHE_KEY);
+        return raw ? normalizeTaxRules(JSON.parse(raw)) : null;
+      } catch (e) { return null; }
+    }
+
+    function applyAutomaticTaxRules(rules) {
+      const normalized = normalizeTaxRules(rules);
+      state.taxRules = normalized;
+      const current = getTaxRulesForDate(new Date().toISOString().slice(0,10));
+      // Only statutory fields are overwritten automatically.
+      state.rates.btlLowRate = current.btlLowRate;
+      state.rates.btlHighRate = current.btlHighRate;
+      state.rates.healthLowRate = current.healthLowRate;
+      state.rates.healthHighRate = current.healthHighRate;
+      state.rates.threshold = current.threshold;
+      state.rates.incomeTaxRates = current.incomeTaxRates.slice();
+      state.rates.incomeTaxBrackets = current.incomeTaxBrackets.slice();
+      state.rates.taxCreditPointValue = current.taxCreditPointValue;
+      saveState();
+    }
+
+    function getTaxRulesStatusText() {
+      const t = translations[state.lang] || translations.he;
+      if (!state.taxRules) return t.taxRulesChecking;
+      const meta = (() => { try { return JSON.parse(localStorage.getItem(TAX_RULES_META_KEY) || '{}'); } catch(e) { return {}; } })();
+      const source = state.taxRules.source || '';
+      let status = source.includes('Built-in') ? t.taxRulesBuiltin : (meta.checkedAt ? t.taxRulesUpdated : t.taxRulesCached);
+      const stamp = state.taxRulesLastUpdated || state.taxRules.updatedAt || meta.updatedAt;
+      const statusEl = document.getElementById('tax-rules-status');
+      const lastEl = document.getElementById('tax-rules-last-updated');
+      if (statusEl) statusEl.textContent = status;
+      if (lastEl) lastEl.textContent = stamp ? t.taxRulesLastUpdated.replace('{date}', stamp) : t.taxRulesNeverUpdated;
+      return status;
+    }
+
+    function renderTaxRulesStatus() {
+      getTaxRulesStatusText();
+    }
+
+    async function refreshTaxRules(manual = false) {
+      const statusEl = document.getElementById('tax-rules-status');
+      const lastEl = document.getElementById('tax-rules-last-updated');
+      const t = translations[state.lang] || translations.he;
+      if (statusEl) statusEl.textContent = t.taxRulesChecking;
+      try {
+        const cached = loadTaxRulesCache();
+        if (cached && !state.taxRules) {
+          state.taxRules = cached;
+          const meta = (() => { try { return JSON.parse(localStorage.getItem(TAX_RULES_META_KEY) || '{}'); } catch(e) { return {}; } })();
+          state.taxRulesLastUpdated = meta.updatedAt || cached.updatedAt || null;
+          applyAutomaticTaxRules(cached);
+        }
+        const response = await fetch(`${TAX_RULES_URL}?v=${Date.now()}`, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = normalizeTaxRules(await response.json());
+        applyAutomaticTaxRules(data);
+        state.taxRulesLastChecked = new Date().toISOString();
+        state.taxRulesLastUpdated = data.updatedAt || new Date().toISOString().slice(0,10);
+        saveTaxRulesCache(data);
+        saveState();
+        renderAll();
+        renderTaxRulesStatus();
+        if (manual) showToast(t.taxRulesUpdated);
+        return true;
+      } catch (e) {
+        const cached = loadTaxRulesCache();
+        try {
+          if (cached) {
+            applyAutomaticTaxRules(cached);
+            state.taxRulesLastUpdated = cached.updatedAt || state.taxRulesLastUpdated;
+          } else {
+            applyAutomaticTaxRules(BUILTIN_TAX_RULES);
+            state.taxRulesLastUpdated = BUILTIN_TAX_RULES.updatedAt;
+          }
+          state.taxRulesLastChecked = new Date().toISOString();
+          saveState();
+          renderAll();
+          renderTaxRulesStatus();
+        } catch (_) {}
+        if (manual) showToast(t.taxRulesFailed);
+        return false;
+      }
+    }
+
     function calculateSalaryTotals() {
       if (state.rates.studyFundRate === undefined) state.rates.studyFundRate = 2.5;
       const wp = getActiveWorkplace();
@@ -1503,8 +1700,8 @@
       const hoursFmt = `${String(th).padStart(2, '0')}:${String(tm).padStart(2, '0')}`;
       const totalGross = shiftsGross + (wp.travelAllowance || 0);
 
-      const r = state.rates;
-      const studyFundRate = Number(r.studyFundRate || 0);
+      const r = Object.assign({}, state.rates, getTaxRulesForDate(new Date().toISOString().slice(0,10)));
+      const studyFundRate = Number(state.rates.studyFundRate || 0);
       const studyFund = shiftsGross * (studyFundRate / 100);
       const adjustedGross = Math.max(0, totalGross - studyFund);
       const taxableGross = Math.max(0, shiftsGross - studyFund);
@@ -2350,6 +2547,11 @@
     }
 
     function ensureStateDefaults() {
+      if (!state.rates || typeof state.rates !== 'object') state.rates = {};
+      if (state.taxRulesAutoUpdate === undefined) state.taxRulesAutoUpdate = true;
+      if (state.taxRulesLastChecked === undefined) state.taxRulesLastChecked = null;
+      if (state.taxRulesLastUpdated === undefined) state.taxRulesLastUpdated = null;
+
       if (state.theme !== 'dark' && state.theme !== 'light') state.theme = 'light';
       if (!['tab-clock','tab-diary','tab-monthly-summary','tab-salary','tab-backup','tab-settings'].includes(state.currentTab)) state.currentTab = 'tab-clock';
       if (!Array.isArray(state.selectedShiftIds)) state.selectedShiftIds = [];
@@ -2453,6 +2655,8 @@
       switchTab('tab-clock', document.querySelector(`.nav-tab-btn[onclick*="'tab-clock'"]`));
       window.scrollTo(0, 0);
       initClockTimer();
+      // Load statutory tax rules in the background; cached/built-in values keep the app working offline.
+      refreshTaxRules(false);
     });
   </script>
 </body></html>
