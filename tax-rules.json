@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "source": "Israel payroll rules baseline - 2026",
+  "updatedAt": "2026-09-21",
+  "periods": [
+    {
+      "from": "2026-01-01",
+      "to": null,
+      "rules": {
+        "btlLowRate": 1.04,
+        "btlHighRate": 7.0,
+        "healthLowRate": 3.23,
+        "healthHighRate": 5.17,
+        "threshold": 7703,
+        "incomeTaxRates": [10, 14, 20, 31, 35, 47, 50],
+        "incomeTaxBrackets": [7010, 10060, 19000, 25100, 46690, 60130],
+        "taxCreditPointValue": 242
+      }
+    }
+  ]
+}
