@@ -1915,7 +1915,11 @@
       if (!state.clockRunning) {
         state.clockRunning = true;
         state.clockStartTime = now;
+        state.isOnBreak = false;
+        state.breakStartTime = null;
         state.totalBreakMinutesToday = 0;
+        // Persist immediately so closing/killing the Android WebView cannot erase the active shift.
+        saveState();
         syncAndroidWidget();
         const breakTotalEl = document.getElementById('today-break-total');
         if (breakTotalEl) breakTotalEl.textContent = `0 ${t.minutesUnit}`;
@@ -1977,6 +1981,8 @@
       if (!state.isOnBreak) {
         state.isOnBreak = true;
         state.breakStartTime = new Date();
+        // Persist break state immediately as well.
+        saveState();
         breakLabel.textContent = t.endBreakBtn;
         pauseBtn.className = 'w-24 h-24 rounded-full bg-amber-400 hover:bg-yellow-400 text-yellow-950 font-black text-xs shadow-md active:scale-95 flex flex-col items-center justify-center gap-1 border-2 border-amber-500 transition ring-2 ring-amber-300';
         if (statusText) statusText.textContent = t.onBreakNow;
@@ -1986,6 +1992,7 @@
         const breakDurMin = Math.floor(breakElapsedSec / 60);
         state.totalBreakMinutesToday = (state.totalBreakMinutesToday || 0) + breakDurMin;
         state.breakStartTime = null;
+        saveState();
 
         breakLabel.textContent = t.breakBtn;
         pauseBtn.className = 'w-24 h-24 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs shadow-md active:scale-95 flex flex-col items-center justify-center gap-1 border-2 border-slate-200 dark:border-slate-600 transition';
@@ -2666,7 +2673,45 @@
       return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     }
 
+    function renderClockStateUI() {
+      const t = translations[state.lang] || translations.he;
+      const clockBtn = document.getElementById('clock-toggle-btn');
+      const clockLabel = document.getElementById('clock-btn-label');
+      const clockSub = document.getElementById('clock-btn-sub');
+      const status = document.getElementById('current-shift-status');
+      const dot = document.getElementById('status-dot');
+      const breakBtn = document.getElementById('clock-pause-btn');
+      const breakLabel = document.getElementById('break-btn-label');
+
+      if (state.clockRunning) {
+        if (clockLabel) clockLabel.textContent = t.clockOut;
+        if (clockSub) clockSub.textContent = t.endShift;
+        if (status) status.textContent = state.isOnBreak ? t.onBreakNow : t.shiftActive;
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+        if (clockBtn) clockBtn.className = 'w-36 h-36 rounded-full bg-rose-500 text-white font-black text-base shadow-xl flex flex-col items-center justify-center gap-1.5 border-4 border-rose-100 transition';
+      } else {
+        if (clockLabel) clockLabel.textContent = t.clockIn;
+        if (clockSub) clockSub.textContent = t.startShift;
+        if (status) status.textContent = t.shiftInactive;
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-slate-400';
+        if (clockBtn) clockBtn.className = 'w-36 h-36 rounded-full bg-emerald-500 text-white font-black text-base shadow-xl flex flex-col items-center justify-center gap-1.5 border-4 border-emerald-100 transition';
+      }
+
+      if (state.isOnBreak && state.clockRunning) {
+        if (breakLabel) breakLabel.textContent = t.endBreakBtn;
+        if (breakBtn) breakBtn.className = 'w-24 h-24 rounded-full bg-amber-400 hover:bg-yellow-400 text-yellow-950 font-black text-xs shadow-md active:scale-95 flex flex-col items-center justify-center gap-1 border-2 border-amber-500 transition ring-2 ring-amber-300';
+      } else {
+        if (breakLabel) breakLabel.textContent = t.breakBtn;
+        if (breakBtn) breakBtn.className = 'w-24 h-24 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs shadow-md active:scale-95 flex flex-col items-center justify-center gap-1 border-2 border-slate-200 dark:border-slate-600 transition';
+      }
+    }
+
+    function persistStateOnAppClose() {
+      try { saveState(); } catch (e) {}
+    }
+
     function renderAll() {
+      renderClockStateUI();
       renderWorkplaceTabs();
       populateSettingsInputs();
       renderShiftTypeSelectors();
@@ -2682,6 +2727,11 @@
         breakEl.textContent = `${state.totalBreakMinutesToday || 0} ${t.minutesUnit}`;
       }
     }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') persistStateOnAppClose();
+    });
+    window.addEventListener('pagehide', persistStateOnAppClose);
 
     document.addEventListener('DOMContentLoaded', () => {
       loadSavedState();
