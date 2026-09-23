@@ -278,7 +278,7 @@
         <div class="text-xs font-bold text-slate-500">100%</div><div class="text-2xl font-black num-font mt-1" id="monthly-hours-100">00:00</div>
       </div>
       <div class="rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-700 p-3 text-center">
-        <div class="text-xs font-bold text-slate-500">120%</div><div class="text-2xl font-black num-font mt-1" id="monthly-hours-120">00:00</div>
+        <div class="text-xs font-bold text-slate-500">125%</div><div class="text-2xl font-black num-font mt-1" id="monthly-hours-125">00:00</div>
       </div>
       <div class="rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-700 p-3 text-center">
         <div class="text-xs font-bold text-slate-500">150%</div><div class="text-2xl font-black num-font mt-1" id="monthly-hours-150">00:00</div>
@@ -1005,7 +1005,7 @@
           sickDailyRate: 324.00,
           shiftTypes: [
             { id: 101, name: 'משמרת בוקר (רגיל)', rate: 36.00, isDefault: true, tiers: [{ hours: 8, percentage: 100 }, { hours: 2, percentage: 125 }, { hours: 2, percentage: 150 }] },
-            { id: 102, name: 'משמרת ערב (125%)', rate: 45.00, isDefault: false, tiers: [{ hours: 7, percentage: 100 }, { hours: 2, percentage: 125 }, { hours: 2, percentage: 150 }] },
+            { id: 102, name: 'משמרת ערב (120%)', rate: 45.00, isDefault: false, tiers: [{ hours: 7, percentage: 100 }, { hours: 2, percentage: 125 }, { hours: 2, percentage: 150 }] },
             { id: 103, name: 'משמרת לילה (150%)', rate: 54.00, isDefault: false, tiers: [{ hours: 7, percentage: 100 }, { hours: 2, percentage: 150 }] },
             { id: 104, name: 'שבת וחג (175%)', rate: 63.00, isDefault: false, tiers: [{ hours: 8, percentage: 175 }, { hours: 2, percentage: 200 }] }
           ]
@@ -1020,7 +1020,7 @@
           sickDailyRate: 350.00,
           shiftTypes: [
             { id: 201, name: 'משמרת בוקר צפון', rate: 42.00, isDefault: true, tiers: [{ hours: 8, percentage: 100 }, { hours: 2, percentage: 125 }, { hours: 2, percentage: 150 }] },
-            { id: 202, name: 'משמרת לילה צפון', rate: 58.00, isDefault: false, tiers: [{ hours: 7, percentage: 120 }, { hours: 2, percentage: 150 }] }
+            { id: 202, name: 'משמרת לילה צפון', rate: 58.00, isDefault: false, tiers: [{ hours: 7, percentage: 125 }, { hours: 2, percentage: 150 }] }
           ]
         }
       ],
@@ -2176,15 +2176,16 @@
     }
 
     function getTierHourBreakdown(hours, st) {
-      const result = { 100: 0, 120: 0, 150: 0, other: 0 };
+      const result = { 100: 0, 125: 0, 150: 0, other: 0 };
       if (!st || !hours) return result;
       const tiers = (st.tiers && st.tiers.length) ? st.tiers : [{ hours: 999999, percentage: 100 }];
       let rem = Number(hours) || 0;
       tiers.forEach((tier, i) => {
         if (rem <= 0) return;
         const take = i === tiers.length - 1 ? rem : Math.min(rem, Number(tier.hours) || 0);
-        const pct = Number(tier.percentage || 100);
-        if (pct === 100 || pct === 120 || pct === 150) result[pct] += take;
+        let pct = Number(tier.percentage || 100);
+        if (pct === 120) pct = 125;
+        if (pct === 100 || pct === 125 || pct === 150) result[pct] += take;
         else result.other += take;
         rem -= take;
       });
@@ -2256,7 +2257,7 @@
       set('monthly-summary-net', `₪${data.net.toFixed(2)}`);
       set('monthly-summary-hours', formatHoursMinutes(data.workMinutes / 60));
       set('monthly-hours-100', formatHoursMinutes(data.tiers[100]));
-      set('monthly-hours-120', formatHoursMinutes(data.tiers[120]));
+      set('monthly-hours-125', formatHoursMinutes(data.tiers[125]));
       set('monthly-hours-150', formatHoursMinutes(data.tiers[150]));
       set('monthly-hours-other', formatHoursMinutes(data.tiers.other));
       set('monthly-work-shifts', String(data.workShiftCount));
@@ -2616,6 +2617,10 @@
               { hours: 2, percentage: 150 }
             ];
           }
+          // Normalize legacy 120% tiers to the app's intended 125% overtime tier.
+          st.tiers.forEach(tier => {
+            if (Number(tier.percentage) === 120) tier.percentage = 125;
+          });
         });
       });
     }
