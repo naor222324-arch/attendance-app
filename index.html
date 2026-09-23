@@ -1037,8 +1037,8 @@
       isOnBreak: false,
       breakStartTime: null,
       totalBreakMinutesToday: 0,
-      selectedCalYear: 2026,
-      selectedCalMonth: 8 // September
+      selectedCalYear: new Date().getFullYear(),
+      selectedCalMonth: new Date().getMonth()
     };
 
     function showToast(msg) {
@@ -2047,7 +2047,10 @@
         mSelect.appendChild(opt);
       });
 
-      for (let y = 2023; y <= 2036; y++) {
+      const currentYear = new Date().getFullYear();
+      const firstYear = 2023;
+      const lastYear = Math.max(currentYear + 10, state.selectedCalYear || currentYear);
+      for (let y = firstYear; y <= lastYear; y++) {
         const opt = document.createElement('option');
         opt.value = y;
         opt.textContent = y;
@@ -2069,6 +2072,9 @@
       else if (m > 11) { m = 0; y++; }
       state.selectedCalMonth = m;
       state.selectedCalYear = y;
+      const ySelect = document.getElementById('calendar-year-select');
+      const yExists = ySelect && Array.from(ySelect.options).some(o => Number(o.value) === y);
+      if (!yExists) populateCalendarSelectors();
       document.getElementById('calendar-month-select').value = m;
       document.getElementById('calendar-year-select').value = y;
       renderCalendar();
@@ -2501,11 +2507,34 @@
     }
 
     function downloadBackupFile() {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
-      const a = document.createElement('a');
-      a.href = dataStr;
-      a.download = `SalaryBackup_${new Date().toISOString().split('T')[0]}.json`;
-      a.click();
+      // Use a Blob URL instead of a data: URL. Android WebView/WebIntoApp
+      // handles Blob downloads more reliably and preserves the .json filename.
+      try {
+        const json = JSON.stringify(state, null, 2);
+        const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const fileName = `SalaryBackup_${new Date().toISOString().split('T')[0]}.json`;
+        a.href = url;
+        a.download = fileName;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+
+        setTimeout(() => {
+          try { a.remove(); } catch (e) {}
+          try { URL.revokeObjectURL(url); } catch (e) {}
+        }, 1500);
+      } catch (error) {
+        console.error('Backup download failed:', error);
+
+        // Fallback for older browsers/WebViews.
+        const dataStr = "data:application/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+        const a = document.createElement('a');
+        a.href = dataStr;
+        a.download = `SalaryBackup_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+      }
     }
 
     function restoreFromFile(e) {
@@ -2593,6 +2622,14 @@
         } catch(e) {}
       } else {
         ensureStateDefaults();
+      }
+      // When a new calendar year begins, open the calendar on the current year/month.
+      // Older years remain available from the selectors.
+      const currentYear = new Date().getFullYear();
+      const currentMonth = new Date().getMonth();
+      if (state.selectedCalYear !== currentYear) {
+        state.selectedCalYear = currentYear;
+        state.selectedCalMonth = currentMonth;
       }
       // Default language is Hebrew until the user explicitly switches it.
       if (!localStorage.getItem('salary_language_user_selected')) {
