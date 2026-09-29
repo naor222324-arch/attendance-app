@@ -1093,9 +1093,31 @@
 
     // Remember the currently visible workplace's calculated net.
     store[activeKey] = {name: workplaceName(), net: activeNet, month: monthKey()};
-    saveNetStore(store);
 
-    const rows = Object.entries(store).filter(([,x]) => x && x.month === monthKey());
+    // Show ONLY workplaces that currently exist in the app.
+    // Old preview data can remain in localStorage after a workplace is deleted,
+    // but it must never appear in the "נטו מכל מקומות העבודה" list.
+    let currentWorkplaceIds = null;
+    try {
+      const master = JSON.parse(localStorage.getItem('salary_app_v5_master') || 'null');
+      if (master && Array.isArray(master.workplaces)) {
+        currentWorkplaceIds = new Set(master.workplaces.map(w => String(w.id)));
+      }
+    } catch (e) {}
+
+    const rows = Object.entries(store).filter(([key, x]) => {
+      if (!x || x.month !== monthKey()) return false;
+      if (currentWorkplaceIds && !currentWorkplaceIds.has(String(key))) return false;
+      return true;
+    });
+
+    // Clean stale deleted workplaces from the preview store as well.
+    if (currentWorkplaceIds) {
+      Object.keys(store).forEach(key => {
+        if (!currentWorkplaceIds.has(String(key))) delete store[key];
+      });
+    }
+    saveNetStore(store);
 
     if (!rows.length) {
       list.innerHTML = '<div class="text-xs text-slate-400 py-4 text-center">עבור בין מקומות העבודה כדי לצבור את הנטו של כל מקום.</div>';
