@@ -1195,6 +1195,130 @@
 </script>
 
 
+<script id="persistent-data-migration-v1">
+(function () {
+  // Persistent storage layer: keeps a complete mirror of localStorage so future
+  // app code versions can restore keys that still exist under their old names.
+  // It intentionally never overwrites a key that already exists.
+  const MIRROR_KEY = 'attendance_persistent_data_mirror_v1';
+  const META_KEY = 'attendance_persistent_data_meta_v1';
+  let syncing = false;
+
+  function rawGet(key) {
+    try { return localStorage.getItem(key); } catch (e) { return null; }
+  }
+  function rawSet(key, value) {
+    try { localStorage.setItem(key, value); return true; } catch (e) { return false; }
+  }
+  function rawRemove(key) {
+    try { localStorage.removeItem(key); } catch (e) {}
+  }
+
+  function readMirror() {
+    try {
+      const parsed = JSON.parse(rawGet(MIRROR_KEY) || 'null');
+      return parsed && parsed.data && typeof parsed.data === 'object' ? parsed : null;
+    } catch (e) { return null; }
+  }
+
+  function collect() {
+    const data = {};
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key || key === MIRROR_KEY || key === META_KEY) continue;
+        data[key] = localStorage.getItem(key);
+      }
+    } catch (e) {}
+    return data;
+  }
+
+  function mirrorNow() {
+    if (syncing) return;
+    syncing = true;
+    try {
+      const snapshot = {
+        version: 1,
+        savedAt: new Date().toISOString(),
+        data: collect()
+      };
+      rawSet(MIRROR_KEY, JSON.stringify(snapshot));
+      rawSet(META_KEY, JSON.stringify({ version: 1, savedAt: snapshot.savedAt }));
+    } finally {
+      syncing = false;
+    }
+  }
+
+  function restoreMissingKeys() {
+    const mirror = readMirror();
+    if (!mirror) return { restored: 0, found: false };
+    let restored = 0;
+    syncing = true;
+    try {
+      Object.keys(mirror.data).forEach(function (key) {
+        if (key === MIRROR_KEY || key === META_KEY) return;
+        // Only restore missing keys. Never overwrite newer/current data.
+        if (rawGet(key) === null && mirror.data[key] !== null && mirror.data[key] !== undefined) {
+          if (rawSet(key, mirror.data[key])) restored++;
+        }
+      });
+    } finally {
+      syncing = false;
+    }
+    return { restored, found: true };
+  }
+
+  function installHooks() {
+    try {
+      const originalSet = localStorage.setItem.bind(localStorage);
+      const originalRemove = localStorage.removeItem.bind(localStorage);
+      const originalClear = localStorage.clear.bind(localStorage);
+
+      localStorage.setItem = function (key, value) {
+        const result = originalSet(key, value);
+        if (!syncing && key !== MIRROR_KEY && key !== META_KEY) mirrorNow();
+        return result;
+      };
+      localStorage.removeItem = function (key) {
+        const result = originalRemove(key);
+        if (!syncing && key !== MIRROR_KEY && key !== META_KEY) mirrorNow();
+        return result;
+      };
+      localStorage.clear = function () {
+        const result = originalClear();
+        if (!syncing) mirrorNow();
+        return result;
+      };
+    } catch (e) {}
+  }
+
+  // Restore first, then install hooks, then create a fresh mirror.
+  const result = restoreMissingKeys();
+  installHooks();
+  mirrorNow();
+
+  // Extra safety: capture changes even if another script keeps a reference to
+  // the original localStorage methods.
+  setInterval(mirrorNow, 3000);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') mirrorNow();
+  });
+  window.addEventListener('pagehide', mirrorNow);
+  window.addEventListener('beforeunload', mirrorNow);
+
+  window.getPersistentDataStatus = function () {
+    const mirror = readMirror();
+    return {
+      version: 1,
+      restoredKeys: result.restored,
+      hasMirror: !!mirror,
+      savedAt: mirror && mirror.savedAt ? mirror.savedAt : null,
+      keyCount: mirror ? Object.keys(mirror.data).length : 0
+    };
+  };
+})();
+</script>
+
 <script id="automatic-backup-manager">
 (function () {
   const SETTINGS_KEY = 'attendance_auto_backup_settings_v1';
