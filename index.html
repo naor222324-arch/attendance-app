@@ -1437,4 +1437,66 @@
 })();
 </script>
 
+
+<script id="android-persistent-storage-v1">
+(function () {
+  /*
+   * Android-side persistence bridge.
+   * The existing localStorage mirror and automatic-backup manager remain intact.
+   * This layer simply copies the complete localStorage dataset to Android and
+   * asks Android to schedule background backup according to the existing UI.
+   */
+  function syncToAndroid() {
+    try {
+      if (!window.AndroidBridge ||
+          typeof window.AndroidBridge.savePersistentData !== 'function') return;
+
+      const data = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key) continue;
+        data[key] = localStorage.getItem(key);
+      }
+
+      window.AndroidBridge.savePersistentData(
+        JSON.stringify(data),
+        new Date().toISOString()
+      );
+    } catch (e) {}
+  }
+
+  function syncBackupSchedule() {
+    try {
+      if (!window.AndroidBridge ||
+          typeof window.AndroidBridge.setAutoBackupSchedule !== 'function') return;
+
+      const raw = localStorage.getItem('attendance_auto_backup_settings_v1');
+      const cfg = raw ? JSON.parse(raw) : {enabled:false, time:'23:00'};
+      const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(cfg.time || '')
+        ? cfg.time : '23:00';
+
+      window.AndroidBridge.setAutoBackupSchedule(!!cfg.enabled, time);
+    } catch (e) {}
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    syncToAndroid();
+    syncBackupSchedule();
+  });
+
+  window.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') {
+      syncToAndroid();
+      syncBackupSchedule();
+    }
+  });
+
+  window.addEventListener('pagehide', syncToAndroid);
+  window.addEventListener('beforeunload', syncToAndroid);
+
+  setInterval(syncToAndroid, 5000);
+  setInterval(syncBackupSchedule, 5000);
+})();
+</script>
+
 </body></html>
