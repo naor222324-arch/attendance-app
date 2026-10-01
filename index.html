@@ -480,14 +480,19 @@
     </label>
     <input id="auto-backup-time" type="time" value="23:00" class="w-28 font-bold num-font text-center rounded-xl border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 py-2 px-2" onchange="window.autoBackupSettingsChanged && window.autoBackupSettingsChanged()"/>
   </div>
-  <div class="flex items-center justify-between gap-2 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50">
-    <div class="min-w-0">
-      <div id="auto-backup-status" class="text-xs font-bold text-emerald-700 dark:text-emerald-300">גיבוי אוטומטי כבוי</div>
-      <div id="auto-backup-last" class="text-[10px] text-slate-400 mt-0.5"></div>
+  <div class="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50">
+    <div class="flex items-center justify-between gap-3">
+      <div class="min-w-0">
+        <div id="auto-backup-status" class="text-xs font-bold text-emerald-700 dark:text-emerald-300">גיבוי אוטומטי כבוי</div>
+        <div id="auto-backup-last" class="text-[10px] text-slate-400 mt-0.5"></div>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <button type="button" onclick="window.autoBackupCreateNow && window.autoBackupCreateNow()" class="px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold active:scale-95 whitespace-nowrap">צור גיבוי עכשיו</button>
+        <button type="button" onclick="window.autoBackupDownloadLast && window.autoBackupDownloadLast()" class="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-bold active:scale-95 whitespace-nowrap">הורד גיבוי אחרון</button>
+      </div>
     </div>
-    <div class="flex items-center gap-2 shrink-0">
-      <button type="button" onclick="window.autoBackupCreateNow && window.autoBackupCreateNow()" class="px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold active:scale-95">צור גיבוי עכשיו</button>
-      <button type="button" onclick="window.autoBackupDownloadLast && window.autoBackupDownloadLast()" class="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-bold active:scale-95">הורד גיבוי אחרון</button>
+    <div class="flex justify-center mt-2.5">
+      <button type="button" onclick="window.androidRestoreLastBackup && window.androidRestoreLastBackup()" class="px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-[10px] font-bold active:scale-95 whitespace-nowrap shadow-sm">📱 שחזר גיבוי אוטומטי אחרון</button>
     </div>
   </div>
 </div>
@@ -1460,6 +1465,36 @@
       alert('הגיבוי האוטומטי נוצר בהצלחה. אפשר ללחוץ על "הורד גיבוי אחרון" כדי לבדוק את הקובץ.');
     } else {
       alert('יצירת הגיבוי נכשלה.');
+    }
+  };
+
+  window.androidRestoreLastBackup = function () {
+    try {
+      if (!window.AndroidBridge || typeof window.AndroidBridge.getPersistentData !== 'function') {
+        alert('שחזור הגיבוי האוטומטי זמין בתוך אפליקציית Android בלבד.');
+        return;
+      }
+      if (!confirm('לשחזר את הנתונים מהגיבוי האוטומטי האחרון? הנתונים הנוכחיים יוחלפו.')) return;
+      const raw = window.AndroidBridge.getPersistentData();
+      if (!raw) {
+        alert('עדיין לא קיים גיבוי אוטומטי באנדרואיד.');
+        return;
+      }
+      const wrapper = JSON.parse(raw);
+      const data = wrapper && wrapper.data ? wrapper.data : wrapper;
+      if (!data || typeof data !== 'object') throw new Error('invalid backup');
+      if (typeof window.AndroidBridge.prepareRestore === 'function') {
+        window.AndroidBridge.prepareRestore();
+      }
+      localStorage.clear();
+      Object.keys(data).forEach(function(key) {
+        localStorage.setItem(key, String(data[key]));
+      });
+      alert('השחזור הושלם. האפליקציה תיטען מחדש.');
+      window.location.reload();
+    } catch (e) {
+      console.error(e);
+      alert('השחזור נכשל.');
     }
   };
 
